@@ -64,7 +64,7 @@ Detail lengkap ada di [Product Requirements Document](docs/PRD.md) ([PDF](docs/P
 
 ## Menjalankan secara lokal
 
-Prasyarat: Node.js 22+ dan MetaMask.
+Prasyarat: Node.js 24+ dan MetaMask.
 
 ```bash
 # 1. Smart contract
