@@ -48,6 +48,12 @@ contract TaxVerse is AccessControl {
     // ─────────────────────────────── Error ──────────────────────────────
 
     error AlamatNol();
+    error VehicleIdKosong();
+    error HashKosong();
+    error TarifNol();
+    error MasaBerlakuKosong();
+    error KendaraanSudahTerdaftar(bytes32 vehicleId);
+    error KendaraanTidakTerdaftar(bytes32 vehicleId);
 
     // ──────────────────────────── Constructor ───────────────────────────
 
@@ -73,10 +79,66 @@ contract TaxVerse is AccessControl {
         kas = kasBaru;
     }
 
+    // ────────────────────────────── Petugas ─────────────────────────────
+
+    /// @notice Daftarkan kendaraan baru.
+    /// @param vehicleId keccak256 dari nomor plat yang sudah dinormalisasi.
+    /// @param pemilik Alamat wallet pemilik kendaraan.
+    /// @param hashDataPemilik Hash data pribadi pemilik yang disimpan off-chain.
+    /// @param tarifTahunan Besar pajak per tahun dalam MockIDR.
+    /// @param berlakuSampai Akhir masa berlaku pajak saat ini (unix timestamp). Boleh di masa lalu
+    ///        jika kendaraan lama yang pajaknya sudah telat dimasukkan ke sistem.
+    function daftarKendaraan(
+        bytes32 vehicleId,
+        address pemilik,
+        bytes32 hashDataPemilik,
+        uint256 tarifTahunan,
+        uint64 berlakuSampai
+    ) external onlyRole(PETUGAS_ROLE) {
+        if (vehicleId == bytes32(0)) revert VehicleIdKosong();
+        if (pemilik == address(0)) revert AlamatNol();
+        if (hashDataPemilik == bytes32(0)) revert HashKosong();
+        if (tarifTahunan == 0) revert TarifNol();
+        if (berlakuSampai == 0) revert MasaBerlakuKosong();
+        if (_terdaftar(vehicleId)) revert KendaraanSudahTerdaftar(vehicleId);
+
+        _kendaraan[vehicleId] = Kendaraan({
+            pemilik: pemilik,
+            berlakuSampai: berlakuSampai,
+            aktif: true,
+            hashDataPemilik: hashDataPemilik,
+            tarifTahunan: tarifTahunan,
+            terdaftarPada: uint64(block.timestamp)
+        });
+
+        emit KendaraanDidaftarkan(vehicleId, pemilik, tarifTahunan);
+    }
+
+    /// @notice Ubah tarif pajak tahunan sebuah kendaraan.
+    function ubahTarif(bytes32 vehicleId, uint256 tarifBaru) external onlyRole(PETUGAS_ROLE) {
+        _wajibTerdaftar(vehicleId);
+        if (tarifBaru == 0) revert TarifNol();
+
+        Kendaraan storage k = _kendaraan[vehicleId];
+        emit TarifDiubah(vehicleId, k.tarifTahunan, tarifBaru);
+        k.tarifTahunan = tarifBaru;
+    }
+
     // ─────────────────────────────── Baca ───────────────────────────────
 
     /// @notice Ambil data lengkap sebuah kendaraan. Field kosong jika belum terdaftar.
     function getKendaraan(bytes32 vehicleId) external view returns (Kendaraan memory) {
         return _kendaraan[vehicleId];
+    }
+
+    // ───────────────────────────── Internal ─────────────────────────────
+
+    /// @dev Kendaraan dianggap terdaftar jika pernah didaftarkan, walaupun nanti diblokir.
+    function _terdaftar(bytes32 vehicleId) internal view returns (bool) {
+        return _kendaraan[vehicleId].terdaftarPada != 0;
+    }
+
+    function _wajibTerdaftar(bytes32 vehicleId) internal view {
+        if (!_terdaftar(vehicleId)) revert KendaraanTidakTerdaftar(vehicleId);
     }
 }
