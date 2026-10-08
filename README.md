@@ -90,6 +90,7 @@ npm run seed:local        # opsional: DEV_WALLET=0x... untuk mengisi wallet Meta
 cd ../frontend
 npm install
 npm run dev               # http://localhost:5173
+npm run sync-contracts    # setelah deploy ulang: salin ABI + alamat kontrak ke frontend
 ```
 
 ### Environment variable
@@ -98,6 +99,8 @@ npm run dev               # http://localhost:5173
 
 | Variabel | Keterangan |
 |---|---|
+| `VITE_CHAIN` | `sepolia` (default) atau `hardhat` untuk blockchain lokal |
+| `VITE_SEPOLIA_RPC_URL` | Opsional. Default memakai RPC publik |
 | `VITE_WALLETCONNECT_PROJECT_ID` | Gratis dari [cloud.reown.com](https://cloud.reown.com). Opsional untuk MetaMask |
 
 **Contracts:** secret disimpan terenkripsi di Hardhat keystore, bukan di file `.env`:
