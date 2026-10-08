@@ -6,7 +6,7 @@ Panduan langkah demi langkah dari nol sampai proyek siap dipamerkan. Centang `[x
 
 ```
 M0 Fondasi ──► M1 Kontrak ──► M2 Deploy ──► M3 Frontend ──► M4 Supabase ──► M5 Rilis
-   ✅ selesai     ⏳ berikutnya
+   ✅ selesai     ✅ selesai     ⏳ berikutnya
 ```
 
 ---
@@ -32,7 +32,7 @@ Tujuan: semua alat siap dan repo sudah online.
 
 ---
 
-## M1 — Kontrak Inti ⏳
+## M1 — Kontrak Inti ✅
 
 Tujuan: kontrak `TaxVerse.sol` lengkap dan teruji. **Ini inti dari proyek.**
 
@@ -51,7 +51,7 @@ Setiap langkah: kode, ringkasan 3–5 poin, test lulus, lalu commit.
 
 ---
 
-## M2 — Deploy ke Sepolia (Testnet)
+## M2 — Deploy ke Sepolia (Testnet) ⏳
 
 Tujuan: kontrak online di blockchain publik dan bisa dilihat siapa saja.
 

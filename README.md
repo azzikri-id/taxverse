@@ -72,9 +72,10 @@ cd contracts
 npm install
 npm test                  # compile + jalankan test
 
-# 2. Jalankan blockchain lokal (terminal terpisah) lalu deploy
+# 2. Jalankan blockchain lokal (terminal terpisah), deploy, lalu isi data contoh
 npm run node
 npm run deploy:local
+npm run seed:local        # opsional: DEV_WALLET=0x... untuk mengisi wallet MetaMask-mu
 
 # 3. Frontend
 cd ../frontend
@@ -104,7 +105,7 @@ npx hardhat keystore set ETHERSCAN_API_KEY
 Detail per langkah: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 - [x] **M0** Setup monorepo, Hardhat, frontend, CI
-- [ ] **M1** Kontrak inti `TaxVerse.sol` + `MockIDR.sol` beserta test
+- [x] **M1** Kontrak inti `TaxVerse.sol` + `MockIDR.sol` beserta test
 - [ ] **M2** Deploy & verifikasi di Sepolia
 - [ ] **M3** Frontend: cek status, bayar pajak, panel petugas
 - [ ] **M4** Integrasi Supabase
