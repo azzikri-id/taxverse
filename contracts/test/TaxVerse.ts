@@ -4,9 +4,9 @@ import { network } from "hardhat";
 import { getAddress, keccak256, toHex, zeroAddress } from "viem";
 
 describe("TaxVerse", async function () {
-  const { viem } = await network.create();
+  const { viem, networkHelpers } = await network.create();
   const publicClient = await viem.getPublicClient();
-  const [admin, petugas, warga, kas] = await viem.getWalletClients();
+  const [admin, petugas, warga, kas, keluarga] = await viem.getWalletClients();
 
   const PETUGAS_ROLE = keccak256(toHex("PETUGAS_ROLE"));
   const ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -259,6 +259,104 @@ describe("TaxVerse", async function () {
         taxverse,
         "AccessControlUnauthorizedAccount",
       );
+    });
+  });
+
+  describe("bayar pajak", function () {
+    // Kendaraan terdaftar + warga sudah punya MockIDR dan sudah approve
+    async function siapBayar() {
+      const hasil = await deployDenganPetugas();
+      const berlakuSampai = await daftarContoh(hasil.taxverse);
+      await hasil.token.write.faucet({ account: warga.account });
+      await hasil.token.write.approve([hasil.taxverse.address, TARIF], { account: warga.account });
+      return { ...hasil, berlakuSampai };
+    }
+
+    it("tepat waktu: token pindah ke kas dan masa berlaku +365 hari dari jatuh tempo", async function () {
+      const { token, taxverse, berlakuSampai } = await siapBayar();
+      const saldoWargaAwal = await token.read.balanceOf([warga.account.address]);
+
+      await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+
+      assert.equal(await token.read.balanceOf([warga.account.address]), saldoWargaAwal - TARIF);
+      assert.equal(await token.read.balanceOf([kas.account.address]), TARIF);
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, berlakuSampai + SATU_TAHUN);
+    });
+
+    it("memancarkan event PajakDibayar sebagai bukti", async function () {
+      const { taxverse, berlakuSampai } = await siapBayar();
+      await viem.assertions.emitWithArgs(
+        taxverse.write.bayarPajak([PLAT], { account: warga.account }),
+        taxverse,
+        "PajakDibayar",
+        [PLAT, getAddress(warga.account.address), TARIF, 0n, berlakuSampai + SATU_TAHUN],
+      );
+    });
+
+    it("telat: masa berlaku +365 hari dihitung dari tanggal bayar", async function () {
+      const { token, taxverse, berlakuSampai } = await siapBayar();
+      await token.write.approve([taxverse.address, TARIF * 2n], { account: warga.account });
+      await networkHelpers.time.increaseTo(berlakuSampai + 30n * 24n * 60n * 60n);
+
+      const hash = await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+      const receipt = await publicClient.getTransactionReceipt({ hash });
+      const waktuBayar = (await publicClient.getBlock({ blockNumber: receipt.blockNumber })).timestamp;
+
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, waktuBayar + SATU_TAHUN);
+    });
+
+    it("orang lain boleh membayarkan, pemilik tidak berubah", async function () {
+      const { token, taxverse } = await siapBayar();
+      await token.write.faucet({ account: keluarga.account });
+      await token.write.approve([taxverse.address, TARIF], { account: keluarga.account });
+
+      await taxverse.write.bayarPajak([PLAT], { account: keluarga.account });
+
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).pemilik, getAddress(warga.account.address));
+      assert.equal(await token.read.balanceOf([kas.account.address]), TARIF);
+    });
+
+    it("bisa bayar di muka beberapa tahun", async function () {
+      const { token, taxverse, berlakuSampai } = await siapBayar();
+      await token.write.approve([taxverse.address, TARIF * 2n], { account: warga.account });
+
+      await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+      await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, berlakuSampai + 2n * SATU_TAHUN);
+    });
+
+    it("ditolak jika kendaraan belum terdaftar", async function () {
+      const { taxverse } = await siapBayar();
+      const platLain = keccak256(toHex("D9999ZZ"));
+      await viem.assertions.revertWithCustomErrorWithArgs(
+        taxverse.write.bayarPajak([platLain], { account: warga.account }),
+        taxverse,
+        "KendaraanTidakTerdaftar",
+        [platLain],
+      );
+    });
+
+    it("ditolak jika belum approve", async function () {
+      const { token, taxverse } = await siapBayar();
+      await token.write.approve([taxverse.address, 0n], { account: warga.account });
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.bayarPajak([PLAT], { account: warga.account }),
+        token,
+        "ERC20InsufficientAllowance",
+      );
+    });
+
+    it("ditolak jika saldo tidak cukup, dan masa berlaku tidak berubah", async function () {
+      const { token, taxverse, berlakuSampai } = await siapBayar();
+      // keluarga approve tapi tidak punya saldo
+      await token.write.approve([taxverse.address, TARIF], { account: keluarga.account });
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.bayarPajak([PLAT], { account: keluarga.account }),
+        token,
+        "ERC20InsufficientBalance",
+      );
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, berlakuSampai);
     });
   });
 

@@ -3,15 +3,21 @@ pragma solidity ^0.8.28;
 
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title TaxVerse
 /// @notice Pencatatan kendaraan dan pembayaran Pajak Kendaraan Bermotor (PKB) di blockchain.
 /// @dev Simulasi untuk testnet. Data pribadi pemilik TIDAK disimpan di sini, hanya hash-nya.
 contract TaxVerse is AccessControl {
+    using SafeERC20 for IERC20;
+
     // ─────────────────────────────── Role ───────────────────────────────
 
     /// @notice Role untuk petugas Samsat yang boleh mendaftarkan kendaraan.
     bytes32 public constant PETUGAS_ROLE = keccak256("PETUGAS_ROLE");
+
+    /// @notice Lama perpanjangan masa berlaku untuk setiap pembayaran.
+    uint64 public constant MASA_BERLAKU = 365 days;
 
     // ─────────────────────────────── Data ───────────────────────────────
 
@@ -54,6 +60,7 @@ contract TaxVerse is AccessControl {
     error MasaBerlakuKosong();
     error KendaraanSudahTerdaftar(bytes32 vehicleId);
     error KendaraanTidakTerdaftar(bytes32 vehicleId);
+    error KendaraanTidakAktif(bytes32 vehicleId);
 
     // ──────────────────────────── Constructor ───────────────────────────
 
@@ -124,6 +131,29 @@ contract TaxVerse is AccessControl {
         k.tarifTahunan = tarifBaru;
     }
 
+    // ───────────────────────────── Pembayaran ───────────────────────────
+
+    /// @notice Bayar pajak tahunan sebuah kendaraan dengan MockIDR.
+    /// @dev Pembayar harus lebih dulu memanggil `token.approve(alamatTaxVerse, total)`.
+    ///      Siapa pun boleh membayar (mis. keluarga), pemilik kendaraan tidak berubah.
+    function bayarPajak(bytes32 vehicleId) external {
+        _wajibTerdaftar(vehicleId);
+        Kendaraan storage k = _kendaraan[vehicleId];
+        if (!k.aktif) revert KendaraanTidakAktif(vehicleId);
+
+        (uint256 pokok, uint256 denda) = _hitungTagihan(k);
+
+        // Checks-effects-interactions: ubah state dulu, baru panggil kontrak lain (token).
+        // Tepat waktu: lanjut dari tanggal jatuh tempo. Telat: mulai dari hari ini.
+        uint64 mulai = k.berlakuSampai > block.timestamp ? k.berlakuSampai : uint64(block.timestamp);
+        uint64 berlakuBaru = mulai + MASA_BERLAKU;
+        k.berlakuSampai = berlakuBaru;
+
+        emit PajakDibayar(vehicleId, msg.sender, pokok, denda, berlakuBaru);
+
+        token.safeTransferFrom(msg.sender, kas, pokok + denda);
+    }
+
     // ─────────────────────────────── Baca ───────────────────────────────
 
     /// @notice Ambil data lengkap sebuah kendaraan. Field kosong jika belum terdaftar.
@@ -140,5 +170,11 @@ contract TaxVerse is AccessControl {
 
     function _wajibTerdaftar(bytes32 vehicleId) internal view {
         if (!_terdaftar(vehicleId)) revert KendaraanTidakTerdaftar(vehicleId);
+    }
+
+    /// @dev Pokok = tarif tahunan. Denda masih 0; rumusnya ditambahkan di M1 langkah 4.
+    function _hitungTagihan(Kendaraan storage k) internal view returns (uint256 pokok, uint256 denda) {
+        pokok = k.tarifTahunan;
+        denda = 0;
     }
 }
