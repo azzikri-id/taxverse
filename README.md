@@ -101,6 +101,8 @@ npx hardhat keystore set ETHERSCAN_API_KEY
 
 ## Roadmap
 
+Detail per langkah: [docs/ROADMAP.md](docs/ROADMAP.md)
+
 - [x] **M0** Setup monorepo, Hardhat, frontend, CI
 - [ ] **M1** Kontrak inti `TaxVerse.sol` + `MockIDR.sol` beserta test
 - [ ] **M2** Deploy & verifikasi di Sepolia
