@@ -511,6 +511,110 @@ describe("TaxVerse", async function () {
     });
   });
 
+  describe("pause (tombol darurat)", function () {
+    it("admin bisa pause dan unpause, event tercatat", async function () {
+      const { taxverse } = await deploy();
+      await viem.assertions.emitWithArgs(taxverse.write.pause(), taxverse, "Paused", [
+        getAddress(admin.account.address),
+      ]);
+      assert.equal(await taxverse.read.paused(), true);
+
+      await viem.assertions.emitWithArgs(taxverse.write.unpause(), taxverse, "Unpaused", [
+        getAddress(admin.account.address),
+      ]);
+      assert.equal(await taxverse.read.paused(), false);
+    });
+
+    it("saat pause: daftar, ubah tarif, dan bayar ditolak", async function () {
+      const { token, taxverse } = await deployDenganPetugas();
+      await daftarContoh(taxverse);
+      await token.write.faucet({ account: warga.account });
+      await token.write.approve([taxverse.address, TARIF], { account: warga.account });
+      await taxverse.write.pause();
+
+      const platLain = keccak256(toHex("D9999ZZ"));
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.daftarKendaraan([platLain, warga.account.address, HASH_PEMILIK, TARIF, 1n], {
+          account: petugas.account,
+        }),
+        taxverse,
+        "EnforcedPause",
+      );
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.ubahTarif([PLAT, 1n], { account: petugas.account }),
+        taxverse,
+        "EnforcedPause",
+      );
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.bayarPajak([PLAT], { account: warga.account }),
+        taxverse,
+        "EnforcedPause",
+      );
+    });
+
+    it("saat pause: cek status dan tagihan tetap bisa", async function () {
+      const { taxverse } = await deployDenganPetugas();
+      await daftarContoh(taxverse);
+      await taxverse.write.pause();
+
+      assert.equal(await taxverse.read.statusPajak([PLAT]), 1); // AKTIF
+      const [pokok] = await taxverse.read.hitungTagihan([PLAT]);
+      assert.equal(pokok, TARIF);
+    });
+
+    it("setelah unpause, pembayaran berjalan lagi", async function () {
+      const { token, taxverse } = await deployDenganPetugas();
+      await daftarContoh(taxverse);
+      await token.write.faucet({ account: warga.account });
+      await token.write.approve([taxverse.address, TARIF], { account: warga.account });
+
+      await taxverse.write.pause();
+      await taxverse.write.unpause();
+      await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+      assert.equal(await token.read.balanceOf([kas.account.address]), TARIF);
+    });
+
+    it("selain admin tidak bisa pause", async function () {
+      const { taxverse } = await deployDenganPetugas();
+      for (const akun of [warga, petugas]) {
+        await viem.assertions.revertWithCustomError(
+          taxverse.write.pause({ account: akun.account }),
+          taxverse,
+          "AccessControlUnauthorizedAccount",
+        );
+      }
+    });
+  });
+
+  describe("reentrancy", function () {
+    async function deployDenganTokenJahat() {
+      const evil = await viem.deployContract("ReentrantToken");
+      const taxverse = await viem.deployContract("TaxVerse", [admin.account.address, evil.address, kas.account.address]);
+      const berlakuSampai = (await sekarang()) + SATU_TAHUN;
+      await taxverse.write.daftarKendaraan([PLAT, warga.account.address, HASH_PEMILIK, TARIF, berlakuSampai]);
+      await evil.write.approve([taxverse.address, TARIF * 10n]);
+      return { evil, taxverse, berlakuSampai };
+    }
+
+    it("kontrol: tanpa serangan, pembayaran dengan token ini berhasil", async function () {
+      const { taxverse, berlakuSampai } = await deployDenganTokenJahat();
+      await taxverse.write.bayarPajak([PLAT]);
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, berlakuSampai + SATU_TAHUN);
+    });
+
+    it("serangan reentrancy ditolak dan tidak ada state yang berubah", async function () {
+      const { evil, taxverse, berlakuSampai } = await deployDenganTokenJahat();
+      await evil.write.setTarget([taxverse.address, PLAT]);
+
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.bayarPajak([PLAT]),
+        taxverse,
+        "ReentrancyGuardReentrantCall",
+      );
+      assert.equal((await taxverse.read.getKendaraan([PLAT])).berlakuSampai, berlakuSampai);
+    });
+  });
+
   describe("baca data", function () {
     it("kendaraan yang belum terdaftar mengembalikan data kosong", async function () {
       const { taxverse } = await deploy();

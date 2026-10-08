@@ -4,11 +4,13 @@ pragma solidity ^0.8.28;
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 /// @title TaxVerse
 /// @notice Pencatatan kendaraan dan pembayaran Pajak Kendaraan Bermotor (PKB) di blockchain.
 /// @dev Simulasi untuk testnet. Data pribadi pemilik TIDAK disimpan di sini, hanya hash-nya.
-contract TaxVerse is AccessControl {
+contract TaxVerse is AccessControl, Pausable, ReentrancyGuardTransient {
     using SafeERC20 for IERC20;
 
     // ─────────────────────────────── Role ───────────────────────────────
@@ -116,6 +118,16 @@ contract TaxVerse is AccessControl {
         _setParameterDenda(bpsPerBulan, maksBps);
     }
 
+    /// @notice Tombol darurat: hentikan pendaftaran, perubahan tarif, dan pembayaran.
+    /// @dev Fungsi baca (status, tagihan) tetap jalan supaya publik masih bisa cek.
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
     // ────────────────────────────── Petugas ─────────────────────────────
 
     /// @notice Daftarkan kendaraan baru.
@@ -131,7 +143,7 @@ contract TaxVerse is AccessControl {
         bytes32 hashDataPemilik,
         uint256 tarifTahunan,
         uint64 berlakuSampai
-    ) external onlyRole(PETUGAS_ROLE) {
+    ) external onlyRole(PETUGAS_ROLE) whenNotPaused {
         if (vehicleId == bytes32(0)) revert VehicleIdKosong();
         if (pemilik == address(0)) revert AlamatNol();
         if (hashDataPemilik == bytes32(0)) revert HashKosong();
@@ -152,7 +164,7 @@ contract TaxVerse is AccessControl {
     }
 
     /// @notice Ubah tarif pajak tahunan sebuah kendaraan.
-    function ubahTarif(bytes32 vehicleId, uint256 tarifBaru) external onlyRole(PETUGAS_ROLE) {
+    function ubahTarif(bytes32 vehicleId, uint256 tarifBaru) external onlyRole(PETUGAS_ROLE) whenNotPaused {
         _wajibTerdaftar(vehicleId);
         if (tarifBaru == 0) revert TarifNol();
 
@@ -166,7 +178,7 @@ contract TaxVerse is AccessControl {
     /// @notice Bayar pajak tahunan sebuah kendaraan dengan MockIDR.
     /// @dev Pembayar harus lebih dulu memanggil `token.approve(alamatTaxVerse, total)`.
     ///      Siapa pun boleh membayar (mis. keluarga), pemilik kendaraan tidak berubah.
-    function bayarPajak(bytes32 vehicleId) external {
+    function bayarPajak(bytes32 vehicleId) external whenNotPaused nonReentrant {
         _wajibTerdaftar(vehicleId);
         Kendaraan storage k = _kendaraan[vehicleId];
         if (!k.aktif) revert KendaraanTidakAktif(vehicleId);
