@@ -10,6 +10,15 @@
 ![React](https://img.shields.io/badge/React-19-61dafb?logo=react)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
+## Kontrak di Sepolia (testnet)
+
+Source code kedua kontrak terverifikasi di Etherscan, jadi siapa pun bisa membaca dan memanggilnya langsung.
+
+| Kontrak | Alamat |
+|---|---|
+| TaxVerse | [`0xA948020ffcf048b675480D22f71402c07baFf02A`](https://sepolia.etherscan.io/address/0xA948020ffcf048b675480D22f71402c07baFf02A#code) |
+| MockIDR (mIDR) | [`0x266224CC4A08eB742c5F6cd59b31eBF638261Bf4`](https://sepolia.etherscan.io/address/0x266224CC4A08eB742c5F6cd59b31eBF638261Bf4#code) |
+
 ## Masalah yang diselesaikan
 
 - Status pajak hanya bisa dicek lewat sistem terpusat, sehingga pihak ketiga (misalnya pembeli mobil bekas) tidak bisa memverifikasi secara mandiri.
@@ -106,7 +115,7 @@ Detail per langkah: [docs/ROADMAP.md](docs/ROADMAP.md)
 
 - [x] **M0** Setup monorepo, Hardhat, frontend, CI
 - [x] **M1** Kontrak inti `TaxVerse.sol` + `MockIDR.sol` beserta test
-- [ ] **M2** Deploy & verifikasi di Sepolia
+- [x] **M2** Deploy & verifikasi di Sepolia
 - [ ] **M3** Frontend: cek status, bayar pajak, panel petugas
 - [ ] **M4** Integrasi Supabase
 - [ ] **M5** Polish, demo live, dokumentasi

@@ -6,7 +6,7 @@ Panduan langkah demi langkah dari nol sampai proyek siap dipamerkan. Centang `[x
 
 ```
 M0 Fondasi ──► M1 Kontrak ──► M2 Deploy ──► M3 Frontend ──► M4 Supabase ──► M5 Rilis
-   ✅ selesai     ✅ selesai     ⏳ berikutnya
+   ✅ selesai     ✅ selesai     ✅ selesai    ⏳ berikutnya
 ```
 
 ---
@@ -27,7 +27,7 @@ Tujuan: semua alat siap dan repo sudah online.
 **Tugas kecil untuk kamu:**
 - [ ] 🧑 Jalankan `npm test` di folder `contracts`, lalu lihat 5 test lulus
 - [ ] 🧑 Jalankan `npm run dev` di folder `frontend`, lalu buka `http://localhost:5173`
-- [ ] 🧑 Siapkan akun MetaMask khusus development (tanpa aset asli)
+- [x] 🧑 Siapkan akun MetaMask khusus development (tanpa aset asli)
 - [ ] 🧑 Aktifkan "Keep my email addresses private" di GitHub Settings → Emails
 
 ---
@@ -51,23 +51,23 @@ Setiap langkah: kode, ringkasan 3–5 poin, test lulus, lalu commit.
 
 ---
 
-## M2 — Deploy ke Sepolia (Testnet) ⏳
+## M2 — Deploy ke Sepolia (Testnet) ✅
 
 Tujuan: kontrak online di blockchain publik dan bisa dilihat siapa saja.
 
-- [ ] 🧑 Daftar [Alchemy](https://www.alchemy.com) (gratis) dan buat app Sepolia untuk mendapatkan RPC URL
-- [ ] 🧑 Daftar [Etherscan](https://etherscan.io) dan buat API key (untuk verifikasi kontrak)
-- [ ] 🧑 Ambil ETH Sepolia gratis dari faucet ke wallet development
-- [ ] 🤝 Simpan secret ke Hardhat keystore (`npx hardhat keystore set ...`)
-- [ ] 🤖 Deploy MockIDR + TaxVerse ke Sepolia
-- [ ] 🤖 Verifikasi kontrak di Etherscan, supaya source code-nya terlihat publik
-- [ ] 🤖 Catat alamat kontrak di README
+- [x] 🧑 Daftar [Alchemy](https://www.alchemy.com) (gratis) dan buat app Sepolia untuk mendapatkan RPC URL
+- [x] 🧑 Daftar [Etherscan](https://etherscan.io) dan buat API key (untuk verifikasi kontrak)
+- [x] 🧑 Ambil ETH Sepolia gratis dari faucet ke wallet development
+- [x] 🤝 Simpan secret ke Hardhat keystore (`npx hardhat keystore set ...`)
+- [x] 🤖 Deploy MockIDR + TaxVerse ke Sepolia
+- [x] 🤖 Verifikasi kontrak di Etherscan, supaya source code-nya terlihat publik
+- [x] 🤖 Catat alamat kontrak di README
 
 **Hasil:** link Etherscan yang bisa kamu bagikan.
 
 ---
 
-## M3 — Frontend
+## M3 — Frontend ⏳
 
 Tujuan: web yang bisa dipakai, terhubung ke kontrak.
 
