@@ -360,6 +360,157 @@ describe("TaxVerse", async function () {
     });
   });
 
+  describe("denda", function () {
+    const HARI = 24n * 60n * 60n;
+    const BULAN = 30n * HARI;
+
+    async function terdaftar() {
+      const hasil = await deployDenganPetugas();
+      const berlakuSampai = await daftarContoh(hasil.taxverse);
+      return { ...hasil, berlakuSampai };
+    }
+
+    // [lama telat, bulan dihitung, denda yang diharapkan]
+    const kasus: [string, bigint, bigint][] = [
+      ["1 detik", 1n, 50_000n], // 2% x Rp2.500.000
+      ["1 hari", HARI, 50_000n],
+      ["tepat 30 hari", BULAN, 50_000n],
+      ["31 hari", BULAN + HARI, 100_000n], // dibulatkan ke 2 bulan = 4%
+      ["3 bulan", 3n * BULAN, 150_000n], // 6%
+      ["24 bulan", 24n * BULAN, 1_200_000n], // 48%, tepat di batas
+      ["5 tahun", 5n * SATU_TAHUN, 1_200_000n], // tetap 48%, tidak lewat batas
+    ];
+
+    for (const [label, telat, dendaDiharapkan] of kasus) {
+      it(`telat ${label}: denda Rp${dendaDiharapkan.toLocaleString("id-ID")}`, async function () {
+        const { taxverse, berlakuSampai } = await terdaftar();
+        await networkHelpers.time.increaseTo(berlakuSampai + telat);
+
+        const [pokok, denda, total] = await taxverse.read.hitungTagihan([PLAT]);
+        assert.equal(pokok, TARIF);
+        assert.equal(denda, dendaDiharapkan);
+        assert.equal(total, TARIF + dendaDiharapkan);
+      });
+    }
+
+    it("tepat di hari jatuh tempo belum kena denda", async function () {
+      const { taxverse, berlakuSampai } = await terdaftar();
+      await networkHelpers.time.increaseTo(berlakuSampai);
+      const [, denda] = await taxverse.read.hitungTagihan([PLAT]);
+      assert.equal(denda, 0n);
+    });
+
+    it("bayar telat menarik pokok + denda ke kas dan dicatat di event", async function () {
+      const { token, taxverse, berlakuSampai } = await terdaftar();
+      await token.write.faucet({ account: warga.account });
+      await token.write.approve([taxverse.address, TARIF * 2n], { account: warga.account });
+
+      const waktuBayar = berlakuSampai + 45n * HARI; // 2 bulan = 4%
+      await networkHelpers.time.setNextBlockTimestamp(waktuBayar);
+      await viem.assertions.emitWithArgs(
+        taxverse.write.bayarPajak([PLAT], { account: warga.account }),
+        taxverse,
+        "PajakDibayar",
+        [PLAT, getAddress(warga.account.address), TARIF, 100_000n, waktuBayar + SATU_TAHUN],
+      );
+      assert.equal(await token.read.balanceOf([kas.account.address]), TARIF + 100_000n);
+    });
+
+    it("hitungTagihan ditolak untuk kendaraan yang belum terdaftar", async function () {
+      const { taxverse } = await deploy();
+      await viem.assertions.revertWithCustomErrorWithArgs(
+        taxverse.read.hitungTagihan([PLAT]),
+        taxverse,
+        "KendaraanTidakTerdaftar",
+        [PLAT],
+      );
+    });
+  });
+
+  describe("parameter denda", function () {
+    it("default 2% per bulan, maksimal 48%", async function () {
+      const { taxverse } = await deploy();
+      assert.equal(await taxverse.read.dendaBpsPerBulan(), 200);
+      assert.equal(await taxverse.read.dendaMaksBps(), 4800);
+    });
+
+    it("admin bisa mengubah parameter dan denda ikut berubah", async function () {
+      const { taxverse } = await deployDenganPetugas();
+      const berlakuSampai = await daftarContoh(taxverse);
+
+      await viem.assertions.emitWithArgs(
+        taxverse.write.setParameterDenda([100, 1000]),
+        taxverse,
+        "ParameterDendaDiubah",
+        [100, 1000],
+      );
+
+      await networkHelpers.time.increaseTo(berlakuSampai + 3n * 30n * 24n * 60n * 60n);
+      const [, denda] = await taxverse.read.hitungTagihan([PLAT]);
+      assert.equal(denda, 75_000n); // 3 bulan x 1% = 3%
+    });
+
+    it("menolak parameter yang tidak masuk akal", async function () {
+      const { taxverse } = await deploy();
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.setParameterDenda([100, 10_001]), // maksimal > 100%
+        taxverse,
+        "ParameterDendaTidakValid",
+      );
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.setParameterDenda([500, 400]), // per bulan > maksimal
+        taxverse,
+        "ParameterDendaTidakValid",
+      );
+    });
+
+    it("selain admin tidak bisa mengubah parameter", async function () {
+      const { taxverse } = await deploy();
+      await viem.assertions.revertWithCustomError(
+        taxverse.write.setParameterDenda([100, 1000], { account: warga.account }),
+        taxverse,
+        "AccessControlUnauthorizedAccount",
+      );
+    });
+  });
+
+  describe("status pajak", function () {
+    const STATUS = { TIDAK_TERDAFTAR: 0, AKTIF: 1, JATUH_TEMPO: 2, TERLAMBAT: 3 } as const;
+    const HARI = 24n * 60n * 60n;
+
+    it("TIDAK_TERDAFTAR untuk plat yang belum terdaftar (tanpa revert)", async function () {
+      const { taxverse } = await deploy();
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.TIDAK_TERDAFTAR);
+    });
+
+    it("AKTIF jika masa berlaku masih lebih dari 30 hari", async function () {
+      const { taxverse } = await deployDenganPetugas();
+      await daftarContoh(taxverse);
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.AKTIF);
+    });
+
+    it("JATUH_TEMPO jika sisa masa berlaku 30 hari atau kurang", async function () {
+      const { taxverse } = await deployDenganPetugas();
+      const berlakuSampai = await daftarContoh(taxverse);
+      await networkHelpers.time.increaseTo(berlakuSampai - 30n * HARI);
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.JATUH_TEMPO);
+      await networkHelpers.time.increaseTo(berlakuSampai);
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.JATUH_TEMPO);
+    });
+
+    it("TERLAMBAT setelah lewat masa berlaku, kembali AKTIF setelah bayar", async function () {
+      const { token, taxverse } = await deployDenganPetugas();
+      const berlakuSampai = await daftarContoh(taxverse);
+      await networkHelpers.time.increaseTo(berlakuSampai + 1n);
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.TERLAMBAT);
+
+      await token.write.faucet({ account: warga.account });
+      await token.write.approve([taxverse.address, TARIF * 2n], { account: warga.account });
+      await taxverse.write.bayarPajak([PLAT], { account: warga.account });
+      assert.equal(await taxverse.read.statusPajak([PLAT]), STATUS.AKTIF);
+    });
+  });
+
   describe("baca data", function () {
     it("kendaraan yang belum terdaftar mengembalikan data kosong", async function () {
       const { taxverse } = await deploy();

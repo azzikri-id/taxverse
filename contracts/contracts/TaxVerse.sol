@@ -19,6 +19,22 @@ contract TaxVerse is AccessControl {
     /// @notice Lama perpanjangan masa berlaku untuk setiap pembayaran.
     uint64 public constant MASA_BERLAKU = 365 days;
 
+    /// @notice Satu "bulan" untuk perhitungan denda.
+    uint64 public constant SATU_BULAN = 30 days;
+
+    /// @notice Status berubah jadi JATUH_TEMPO jika sisa masa berlaku <= nilai ini.
+    uint64 public constant BATAS_JATUH_TEMPO = 30 days;
+
+    /// @notice 100% dalam basis point (1% = 100 bps).
+    uint16 public constant BPS = 10_000;
+
+    enum Status {
+        TIDAK_TERDAFTAR,
+        AKTIF,
+        JATUH_TEMPO,
+        TERLAMBAT
+    }
+
     // ─────────────────────────────── Data ───────────────────────────────
 
     /// @dev Urutan field disusun supaya hemat storage:
@@ -38,6 +54,12 @@ contract TaxVerse is AccessControl {
     /// @notice Alamat penerima pembayaran pajak (kas daerah).
     address public kas;
 
+    /// @notice Denda per bulan keterlambatan, dalam bps dari pokok (default 200 = 2%).
+    uint16 public dendaBpsPerBulan;
+
+    /// @notice Batas maksimal denda, dalam bps dari pokok (default 4800 = 48%).
+    uint16 public dendaMaksBps;
+
     /// @dev Key = vehicleId = keccak256(nomor plat yang sudah dinormalisasi, mis. "B1234XYZ").
     mapping(bytes32 vehicleId => Kendaraan) private _kendaraan;
 
@@ -50,6 +72,7 @@ contract TaxVerse is AccessControl {
     event BalikNama(bytes32 indexed vehicleId, address indexed dari, address indexed ke);
     event TarifDiubah(bytes32 indexed vehicleId, uint256 tarifLama, uint256 tarifBaru);
     event KasDiubah(address kasLama, address kasBaru);
+    event ParameterDendaDiubah(uint16 bpsPerBulan, uint16 maksBps);
 
     // ─────────────────────────────── Error ──────────────────────────────
 
@@ -61,6 +84,7 @@ contract TaxVerse is AccessControl {
     error KendaraanSudahTerdaftar(bytes32 vehicleId);
     error KendaraanTidakTerdaftar(bytes32 vehicleId);
     error KendaraanTidakAktif(bytes32 vehicleId);
+    error ParameterDendaTidakValid();
 
     // ──────────────────────────── Constructor ───────────────────────────
 
@@ -75,6 +99,7 @@ contract TaxVerse is AccessControl {
 
         token = token_;
         kas = kas_;
+        _setParameterDenda(200, 4800); // 2% per bulan, maksimal 48%
     }
 
     // ─────────────────────────────── Admin ──────────────────────────────
@@ -84,6 +109,11 @@ contract TaxVerse is AccessControl {
         if (kasBaru == address(0)) revert AlamatNol();
         emit KasDiubah(kas, kasBaru);
         kas = kasBaru;
+    }
+
+    /// @notice Ubah aturan denda. Contoh: (200, 4800) = 2% per bulan, maksimal 48%.
+    function setParameterDenda(uint16 bpsPerBulan, uint16 maksBps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _setParameterDenda(bpsPerBulan, maksBps);
     }
 
     // ────────────────────────────── Petugas ─────────────────────────────
@@ -156,6 +186,24 @@ contract TaxVerse is AccessControl {
 
     // ─────────────────────────────── Baca ───────────────────────────────
 
+    /// @notice Rincian tagihan jika dibayar sekarang.
+    /// @dev Denda bisa naik jika transaksi bayar masuk blok setelah melewati batas bulan,
+    ///      jadi frontend sebaiknya approve sedikit lebih besar dari `total`.
+    function hitungTagihan(bytes32 vehicleId) external view returns (uint256 pokok, uint256 denda, uint256 total) {
+        _wajibTerdaftar(vehicleId);
+        (pokok, denda) = _hitungTagihan(_kendaraan[vehicleId]);
+        total = pokok + denda;
+    }
+
+    /// @notice Status pajak sebuah kendaraan. Tidak pernah revert, aman dipakai untuk cek publik.
+    function statusPajak(bytes32 vehicleId) external view returns (Status) {
+        Kendaraan storage k = _kendaraan[vehicleId];
+        if (!k.aktif) return Status.TIDAK_TERDAFTAR;
+        if (block.timestamp > k.berlakuSampai) return Status.TERLAMBAT;
+        if (k.berlakuSampai - block.timestamp <= BATAS_JATUH_TEMPO) return Status.JATUH_TEMPO;
+        return Status.AKTIF;
+    }
+
     /// @notice Ambil data lengkap sebuah kendaraan. Field kosong jika belum terdaftar.
     function getKendaraan(bytes32 vehicleId) external view returns (Kendaraan memory) {
         return _kendaraan[vehicleId];
@@ -172,9 +220,23 @@ contract TaxVerse is AccessControl {
         if (!_terdaftar(vehicleId)) revert KendaraanTidakTerdaftar(vehicleId);
     }
 
-    /// @dev Pokok = tarif tahunan. Denda masih 0; rumusnya ditambahkan di M1 langkah 4.
+    /// @dev Pokok = tarif tahunan. Denda = pokok x (bulan terlambat x bps per bulan), dibatasi maksimal.
+    ///      Bulan dibulatkan ke atas: telat 1 hari = 1 bulan, telat 31 hari = 2 bulan.
     function _hitungTagihan(Kendaraan storage k) internal view returns (uint256 pokok, uint256 denda) {
         pokok = k.tarifTahunan;
-        denda = 0;
+        if (block.timestamp <= k.berlakuSampai) return (pokok, 0);
+
+        uint256 bulanTerlambat = (block.timestamp - k.berlakuSampai + SATU_BULAN - 1) / SATU_BULAN;
+        uint256 persenBps = bulanTerlambat * dendaBpsPerBulan;
+        if (persenBps > dendaMaksBps) persenBps = dendaMaksBps;
+
+        denda = (pokok * persenBps) / BPS;
+    }
+
+    function _setParameterDenda(uint16 bpsPerBulan, uint16 maksBps) internal {
+        if (maksBps > BPS || bpsPerBulan > maksBps) revert ParameterDendaTidakValid();
+        dendaBpsPerBulan = bpsPerBulan;
+        dendaMaksBps = maksBps;
+        emit ParameterDendaDiubah(bpsPerBulan, maksBps);
     }
 }

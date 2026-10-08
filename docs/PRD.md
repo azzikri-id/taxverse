@@ -152,9 +152,9 @@ struct Kendaraan {
 | `ubahTarif(vehicleId, tarifBaru)` | Petugas | Memperbarui tarif tahunan |
 | `bayarPajak(vehicleId)` | Siapa saja | Menarik `tarif + denda` MockIDR (via `transferFrom`) ke kas, lalu memperpanjang masa berlaku 365 hari |
 | `hitungTagihan(vehicleId) view` | Publik | Mengembalikan `(pokok, denda, total)` |
-| `statusPajak(vehicleId) view` | Publik | Mengembalikan `AKTIF`, `JATUH_TEMPO` (≤ 30 hari lagi), atau `TERLAMBAT` |
+| `statusPajak(vehicleId) view` | Publik | Mengembalikan `TIDAK_TERDAFTAR`, `AKTIF`, `JATUH_TEMPO` (≤ 30 hari lagi), atau `TERLAMBAT`. Tidak pernah revert |
 | `baliknama(vehicleId, pemilikBaru, hashDataBaru)` | Petugas | Mengganti pemilik (P1). Syarat: pajak tidak terlambat |
-| `setParameterDenda(persenPerBulan, maksPersen)` | Admin | Default 2%/bulan, maksimal 48% (simulasi) |
+| `setParameterDenda(bpsPerBulan, maksBps)` | Admin | Dalam basis point (1% = 100). Default 200 (2%/bulan), maksimal 4800 (48%). Bulan keterlambatan = 30 hari, dibulatkan ke atas |
 | `setKas(alamat)` | Admin | Mengatur alamat penerima pembayaran |
 | `pause()` / `unpause()` | Admin | Tombol darurat |
 
