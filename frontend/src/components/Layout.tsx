@@ -11,15 +11,15 @@ const MENU = [
   { to: '/saya', label: 'Kendaraan Saya', khusus: 'terhubung' },
   { to: '/faucet', label: 'Faucet' },
   { to: '/petugas', label: 'Petugas', khusus: 'petugas' },
+  { to: '/admin', label: 'Admin', khusus: 'admin' },
 ]
 
 export function Layout() {
   const linkKontrak = explorerLink('address', contracts.taxverse)
   const { isConnected } = useAccount()
-  const { isPetugas } = useRole()
-  const menu = MENU.filter(
-    (m) => !m.khusus || (m.khusus === 'terhubung' && isConnected) || (m.khusus === 'petugas' && isPetugas),
-  )
+  const { isPetugas, isAdmin } = useRole()
+  const boleh: Record<string, boolean> = { terhubung: isConnected, petugas: isPetugas, admin: isAdmin }
+  const menu = MENU.filter((m) => !m.khusus || boleh[m.khusus])
 
   return (
     <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,_#312e81_0%,_#020617_55%)]">

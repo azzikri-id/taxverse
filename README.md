@@ -119,7 +119,7 @@ Detail per langkah: [docs/ROADMAP.md](docs/ROADMAP.md)
 - [x] **M0** Setup monorepo, Hardhat, frontend, CI
 - [x] **M1** Kontrak inti `TaxVerse.sol` + `MockIDR.sol` beserta test
 - [x] **M2** Deploy & verifikasi di Sepolia
-- [ ] **M3** Frontend: cek status, bayar pajak, panel petugas
+- [x] **M3** Frontend: cek status, bayar pajak, panel petugas & admin
 - [ ] **M4** Integrasi Supabase
 - [ ] **M5** Polish, demo live, dokumentasi
 

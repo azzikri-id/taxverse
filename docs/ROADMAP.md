@@ -6,7 +6,7 @@ Panduan langkah demi langkah dari nol sampai proyek siap dipamerkan. Centang `[x
 
 ```
 M0 Fondasi ──► M1 Kontrak ──► M2 Deploy ──► M3 Frontend ──► M4 Supabase ──► M5 Rilis
-   ✅ selesai     ✅ selesai     ✅ selesai    ⏳ berikutnya
+   ✅ selesai     ✅ selesai     ✅ selesai    ✅ selesai      ⏳ berikutnya
 ```
 
 ---
@@ -67,7 +67,7 @@ Tujuan: kontrak online di blockchain publik dan bisa dilihat siapa saja.
 
 ---
 
-## M3 — Frontend ⏳
+## M3 — Frontend ✅
 
 Tujuan: web yang bisa dipakai, terhubung ke kontrak.
 
@@ -82,11 +82,11 @@ Tujuan: web yang bisa dipakai, terhubung ke kontrak.
 | 7 | 🤖 `/admin`: kelola role & parameter denda | Admin |
 | 8 | 🤖 Status transaksi yang jelas (menunggu, pending, sukses/gagal) + link Etherscan | Semua |
 
-- [ ] 🧑 Coba alur lengkap: daftar kendaraan → ambil faucet → bayar → cek status
+- [x] 🧑 Coba alur lengkap: daftar kendaraan → ambil faucet → bayar → cek status
 
 ---
 
-## M4 — Integrasi Supabase
+## M4 — Integrasi Supabase ⏳
 
 Tujuan: data pribadi tersimpan aman di luar blockchain.
 

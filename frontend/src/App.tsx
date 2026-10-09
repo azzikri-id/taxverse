@@ -2,6 +2,7 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router'
 
 import { Layout } from './components/Layout.tsx'
 import { Beranda } from './pages/Beranda.tsx'
+import { Admin } from './pages/Admin.tsx'
 import { Bayar } from './pages/Bayar.tsx'
 import { CekPlat } from './pages/CekPlat.tsx'
 import { Faucet } from './pages/Faucet.tsx'
@@ -19,6 +20,7 @@ export default function App() {
           <Route path="saya" element={<Saya />} />
           <Route path="faucet" element={<Faucet />} />
           <Route path="petugas" element={<Petugas />} />
+          <Route path="admin" element={<Admin />} />
           <Route path="*" element={<TidakDitemukan />} />
         </Route>
       </Routes>
