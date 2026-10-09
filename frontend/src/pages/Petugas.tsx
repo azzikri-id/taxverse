@@ -85,6 +85,8 @@ function FormDaftar() {
     query: { enabled: platValid(plat) },
   })
   const sudahTerdaftar = statusSekarang !== undefined && statusSekarang !== 0
+  // Plat yang barusan berhasil kita daftarkan memang "sudah terdaftar", tapi itu bukan error.
+  const baruDidaftarkan = tx.status === 'success' && normalisasiPlat(plat) === platTerkirim
 
   useEffect(() => {
     if (tx.status === 'success') refetchStatus()
@@ -133,8 +135,14 @@ function FormDaftar() {
           onChange={(e) => setPlat(e.target.value.toUpperCase())}
           placeholder="B 1234 XYZ"
           className="font-mono tracking-wider"
-          error={error.plat || (sudahTerdaftar && 'Plat ini sudah terdaftar')}
-          bantuan={platValid(plat) ? `Disimpan sebagai ${tampilkanPlat(plat)}` : undefined}
+          error={error.plat || (sudahTerdaftar && !baruDidaftarkan && 'Plat ini sudah terdaftar')}
+          bantuan={
+            baruDidaftarkan
+              ? '✅ Berhasil didaftarkan'
+              : platValid(plat)
+                ? `Disimpan sebagai ${tampilkanPlat(plat)}`
+                : undefined
+          }
         />
         <Field
           label="Wallet pemilik"
