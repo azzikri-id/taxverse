@@ -2,15 +2,19 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { Link, NavLink, Outlet } from 'react-router'
 
 import { contracts, explorerLink, targetChain } from '../config.ts'
+import { useRole } from '../hooks/useRole.ts'
 import { alamatPendek } from '../lib/format.ts'
 
 const MENU = [
   { to: '/', label: 'Cek Pajak', end: true },
   { to: '/faucet', label: 'Faucet' },
+  { to: '/petugas', label: 'Petugas', khusus: 'petugas' as const },
 ]
 
 export function Layout() {
   const linkKontrak = explorerLink('address', contracts.taxverse)
+  const { isPetugas } = useRole()
+  const menu = MENU.filter((m) => !m.khusus || (m.khusus === 'petugas' && isPetugas))
 
   return (
     <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top,_#312e81_0%,_#020617_55%)]">
@@ -21,7 +25,7 @@ export function Layout() {
             TaxVerse
           </Link>
           <nav className="flex gap-1 text-sm">
-            {MENU.map((m) => (
+            {menu.map((m) => (
               <NavLink
                 key={m.to}
                 to={m.to}
