@@ -36,5 +36,11 @@ export function pesanError(error: unknown): string {
     return 'Saldo ETH tidak cukup untuk biaya gas.'
   }
 
+  // MetaMask "smart account" (EIP-7702) membungkus transaksi lewat kontrak delegasi;
+  // jika gagal di dalamnya, alasan revert-nya hilang. Panggilan langsung tetap berhasil.
+  if (/unknown reason/i.test(error.message)) {
+    return 'Transaksi gagal tanpa alasan yang jelas. Jika memakai MetaMask, coba matikan "Smart account" untuk jaringan ini (Account details → Smart account), lalu ulangi.'
+  }
+
   return error.shortMessage || 'Terjadi kesalahan. Coba lagi.'
 }
