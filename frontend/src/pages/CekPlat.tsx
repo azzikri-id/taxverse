@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import type { Hex } from 'viem'
 import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
-import { useParams } from 'react-router'
+import { Link, useParams } from 'react-router'
 
 import { FormCekPlat } from '../components/FormCekPlat.tsx'
 import { Kartu } from '../components/Kartu.tsx'
@@ -12,6 +12,7 @@ import { useSekarang } from '../hooks/useSekarang.ts'
 import { taxverseAbi } from '../contracts/generated.ts'
 import { alamatPendek, rupiah, selisihHari, tanggal, tanggalJam } from '../lib/format.ts'
 import { platValid, tampilkanPlat, vehicleIdDari } from '../lib/plat.ts'
+import { ingatPlat } from '../lib/platDikenal.ts'
 
 const taxverse = { address: contracts.taxverse, abi: taxverseAbi, chainId: targetChain.id } as const
 
@@ -31,6 +32,10 @@ export function CekPlat() {
 
   const status = data?.[0].result
   const terdaftar = status !== undefined && status !== 0
+
+  useEffect(() => {
+    if (terdaftar) ingatPlat(plat)
+  }, [terdaftar, plat])
 
   return (
     <div className="space-y-6 pt-8">
@@ -75,7 +80,7 @@ export function CekPlat() {
       {terdaftar && data?.[1].result && (
         <>
           <RingkasanStatus status={status} kendaraan={data[1].result} />
-          {data[2].result && <Tagihan tagihan={data[2].result} />}
+          {data[2].result && <Tagihan tagihan={data[2].result} plat={plat} />}
           <Riwayat vehicleId={id} />
         </>
       )}
@@ -122,7 +127,7 @@ function RingkasanStatus({ status, kendaraan }: { status: number; kendaraan: Ken
   )
 }
 
-function Tagihan({ tagihan: [pokok, denda, total] }: { tagihan: readonly [bigint, bigint, bigint] }) {
+function Tagihan({ tagihan: [pokok, denda, total], plat }: { tagihan: readonly [bigint, bigint, bigint]; plat: string }) {
   return (
     <Kartu>
       <h2 className="font-semibold">Tagihan jika dibayar hari ini</h2>
@@ -133,6 +138,12 @@ function Tagihan({ tagihan: [pokok, denda, total] }: { tagihan: readonly [bigint
           <Baris label="Total" nilai={rupiah(total)} tebal />
         </div>
       </dl>
+      <Link
+        to={`/bayar/${plat}`}
+        className="mt-5 block rounded-xl bg-indigo-600 px-5 py-3 text-center font-semibold transition hover:bg-indigo-500"
+      >
+        Bayar pajak
+      </Link>
     </Kartu>
   )
 }

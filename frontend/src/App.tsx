@@ -2,9 +2,11 @@ import { BrowserRouter, Link, Route, Routes } from 'react-router'
 
 import { Layout } from './components/Layout.tsx'
 import { Beranda } from './pages/Beranda.tsx'
+import { Bayar } from './pages/Bayar.tsx'
 import { CekPlat } from './pages/CekPlat.tsx'
 import { Faucet } from './pages/Faucet.tsx'
 import { Petugas } from './pages/Petugas.tsx'
+import { Saya } from './pages/Saya.tsx'
 
 export default function App() {
   return (
@@ -13,6 +15,8 @@ export default function App() {
         <Route element={<Layout />}>
           <Route index element={<Beranda />} />
           <Route path="cek/:plat" element={<CekPlat />} />
+          <Route path="bayar/:plat" element={<Bayar />} />
+          <Route path="saya" element={<Saya />} />
           <Route path="faucet" element={<Faucet />} />
           <Route path="petugas" element={<Petugas />} />
           <Route path="*" element={<TidakDitemukan />} />

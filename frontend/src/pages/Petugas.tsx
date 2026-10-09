@@ -14,6 +14,7 @@ import { useRole } from '../hooks/useRole.ts'
 import { rupiah } from '../lib/format.ts'
 import { hashPemilik, nikValid } from '../lib/pemilik.ts'
 import { normalisasiPlat, platValid, tampilkanPlat, vehicleIdDari } from '../lib/plat.ts'
+import { ingatPlat } from '../lib/platDikenal.ts'
 
 const taxverse = { address: contracts.taxverse, abi: taxverseAbi, chainId: targetChain.id } as const
 
@@ -104,6 +105,7 @@ function FormDaftar() {
   function kirim() {
     if (!lengkap || sudahTerdaftar || !isAddress(pemilik)) return
     setPlatTerkirim(normalisasiPlat(plat))
+    ingatPlat(plat)
     tx.writeContract({
       ...taxverse,
       functionName: 'daftarKendaraan',
